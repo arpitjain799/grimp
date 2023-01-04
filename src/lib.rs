@@ -11,14 +11,47 @@ use std::collections::{HashSet, HashMap};
 //    importers_by_imported: Map of modules directly imported by each key.
 //    importeds_by_importer: Map of all the modules that directly import each key.
 #[pyfunction]
-fn bidirectional_shortest_path(
-    importer: String,
-    imported: String,
-    importers_by_imported: HashMap<String, HashSet<String>>,
-    importeds_by_importer: HashMap<String, HashSet<String>>
-) -> Option<Vec<String>> {
-    let path = vec![importer, imported, "blue".to_string()];
-    Some(path)
+fn bidirectional_shortest_path<'a>(
+    importer: &'a str,
+    imported: &'a str,
+    importers_by_imported: &'a HashMap<&'a str, HashSet<&'a str>>,
+    importeds_by_importer: &'a HashMap<&'a str, HashSet<&'a str>>
+) -> Option<Vec<&'a str>> {
+    let results_or_none = search_for_path(
+        &importer,
+        &imported,
+        &importers_by_imported,
+        &importeds_by_importer
+    );
+    match results_or_none {
+        Some(results) => {
+
+            let (pred, succ, initial_w) = results;
+
+            let mut w_or_none: Option<&str> = Some(initial_w);
+            // Transform results into tuple.
+            let mut path: Vec<&str> = Vec::new();
+            // From importer to w:
+            while w_or_none.is_some() {
+                let w = w_or_none.unwrap();
+                path.push(w);
+                w_or_none = pred[w];
+            }
+            path.reverse();
+
+            // From w to imported:
+            w_or_none = succ[path.last().unwrap()];
+            while w_or_none.is_some() {
+                let w = w_or_none.unwrap();
+                path.push(w);
+                w_or_none = succ[w];
+            }
+
+            Some(path)
+        },
+        None => None
+    }
+
 }
 
 /// Performs a breadth first search from both source and target, meeting in the middle.
@@ -28,16 +61,16 @@ fn bidirectional_shortest_path(
 //         - pred is a dictionary of predecessors from w to the source, and
 //         - succ is a dictionary of successors from w to the target.
 //
-fn search_for_path(
-    importer: &String,
-    imported: &String,
-    importers_by_imported: HashMap<&String, HashSet<&String>>,
-    importeds_by_importer: HashMap<&String, HashSet<&String>>
+fn search_for_path<'a>(
+    importer: &'a str,
+    imported: &'a str,
+    importers_by_imported: &'a HashMap<&'a str, HashSet<&'a str>>,
+    importeds_by_importer: &'a HashMap<&'a str, HashSet<&'a str>>
 ) -> Option<
         (
-            HashMap<&String, Option<&String>>,
-            HashMap<&String, Option<&String>>,
-            &String
+            HashMap<&'a str, Option<&'a str>>,
+            HashMap<&'a str, Option<&'a str>>,
+            &'a str
         )
      >
 {
@@ -46,18 +79,19 @@ fn search_for_path(
         Some(
             (
                 HashMap::from([
-                    (&imported, None),
+                    (imported, None),
                 ]),
                 HashMap::from([
-                    (&importer, None),
+                    (importer, None),
                 ]),
-                &importer
+                importer
             )
         )
     }
     else {
         None // TODO
     }
+
 }
 
 
