@@ -5,10 +5,10 @@ use std::collections::{HashSet, HashMap};
 #[pyfunction]
 fn foo<'a>(
     mystring: &'a PyUnicode,
-) -> PyResult<Vec<String>> {
-    //let _mystring: String = mystring.extract()?;
-    let mut list: Vec<String> = Vec::new();
-    list.push(mystring.to_string());
+) -> PyResult<Vec<&str>> {
+    let _mystring: &str = mystring.to_str()?;
+    let mut list: Vec<&str> = Vec::new();
+    list.push(_mystring);
     Ok(list)
 }
 
