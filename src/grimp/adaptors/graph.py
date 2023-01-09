@@ -463,12 +463,13 @@ class ImportGraph(graph.AbstractImportGraph):
         # in the graph first.
         if turbo:
             import _grimp_rust as rust
-            return tuple(rust.bidirectional_shortest_path(
+            path = rust.bidirectional_shortest_path(
                 importers_by_imported=self._importers_by_imported,
                 importeds_by_importer=self._importeds_by_importer,
                 importer=importer,
                 imported=imported,
-            ))
+            )
+            return tuple(path) if path else None
         else:
             return bidirectional_shortest_path(
                 importers_by_imported=self._importers_by_imported,

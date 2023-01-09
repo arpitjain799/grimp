@@ -1,15 +1,21 @@
 use pyo3::prelude::*;
-use pyo3::types::{PyUnicode, PyDict, PyList};
+use pyo3::types::{PyUnicode, PyDict};
 use std::collections::{HashSet, HashMap};
 
 #[pyfunction]
 fn foo<'a>(
-    mystring: &'a PyUnicode,
-) -> PyResult<Vec<&str>> {
-    let _mystring: &str = mystring.to_str()?;
+    importer: &'a PyUnicode,
+    imported: &'a PyUnicode,
+    importers_by_imported: &'a PyDict,
+) -> PyResult<Option<Vec<&'a str>>> {
+    let _importer: &str = importer.extract()?;
+    let _imported: &str = imported.extract()?;
+    let _importers_by_imported: HashMap<&str, HashSet<&str>> = importers_by_imported.extract()?;
+
     let mut list: Vec<&str> = Vec::new();
-    list.push(_mystring);
-    Ok(list)
+    list.push(_importer);
+    list.push(_imported);
+    Ok(Some(list))
 }
 
 /// Return a tuple of modules in the shortest path between importer and imported.
@@ -26,100 +32,153 @@ fn bidirectional_shortest_path<'a>(
     importer: &'a PyUnicode,
     imported: &'a PyUnicode,
     importers_by_imported: &'a PyDict,
-    importeds_by_importer: &'a PyDict
-) -> PyResult<Option<Vec<String>>> {
-    let _importer: String = importer.extract()?;
-    let _imported: String = imported.extract()?;
-    let _importers_by_imported: HashMap<String, HashSet<String>> = importers_by_imported.extract()?;
-    let _importeds_by_importer: HashMap<String, HashSet<String>> = importeds_by_importer.extract()?;
-    Ok(None)
-//     let path_or_none: Option<Vec<String>> = _bidirectional_shortest_path(
-//         &_importer, &_imported, &_importers_by_imported, &_importeds_by_importer
-//     );
-//     Ok(path_or_none)
+    importeds_by_importer: &'a PyDict,
+) -> PyResult<Option<Vec<&'a str>>> {
+    let _importer: &str = importer.extract()?;
+    let _imported: &str = imported.extract()?;
+    let _importers_by_imported: HashMap<&str, HashSet<&str>> = importers_by_imported.extract()?;
+    let _importeds_by_importer: HashMap<&str, HashSet<&str>> = importeds_by_importer.extract()?;
+
+    let path_or_none: Option<Vec<&str>> = _bidirectional_shortest_path(
+        _importer, _imported, _importers_by_imported, _importeds_by_importer
+    );
+    Ok(path_or_none)
 }
 
 
-// fn _bidirectional_shortest_path<'a>(
-//     importer: &'a str,
-//     imported: &'a str,
-//     importers_by_imported: &'a HashMap<String, HashSet<String>>,
-//     importeds_by_importer: &'a HashMap<String, HashSet<String>>
-// ) -> Option<Vec<String>> {
-//     let results_or_none = search_for_path(
-//         &importer,
-//         &imported,
-//         &importers_by_imported,
-//         &importeds_by_importer
-//     );
-//     match results_or_none {
-//         Some(results) => {
+fn _bidirectional_shortest_path<'a>(
+    importer: &'a str,
+    imported: &'a str,
+    importers_by_imported: HashMap<&'a str, HashSet<&'a str>>,
+    importeds_by_importer: HashMap<&'a str, HashSet<&'a str>>,
+) -> Option<Vec<&'a str>> {
+    let results_or_none = search_for_path(
+        importer,
+        imported,
+        importers_by_imported,
+        importeds_by_importer
+    );
+    match results_or_none {
+        Some(results) => {
+
+            let (pred, succ, initial_w) = results;
+
+            let mut w_or_none: Option<&str> = Some(initial_w);
+            // Transform results into tuple.
+            let mut path: Vec<&str> = Vec::new();
+            // From importer to w:
+            while w_or_none.is_some() {
+                let w = w_or_none.unwrap();
+                path.push(w);
+                w_or_none = pred[&w];
+            }
+            path.reverse();
+
+            // From w to imported:
+            w_or_none = succ[path.last().unwrap()];
+            while w_or_none.is_some() {
+                let w = w_or_none.unwrap();
+                path.push(w);
+                w_or_none = succ[&w];
+            }
+
+            Some(path)
+        },
+        None => None
+    }
+}
+/// Performs a breadth first search from both source and target, meeting in the middle.
 //
-//             let (pred, succ, initial_w) = results;
+//  Returns:
+//      (pred, succ, w) where
+//         - pred is a dictionary of predecessors from w to the source, and
+//         - succ is a dictionary of successors from w to the target.
 //
-//             let mut w_or_none: Option<String> = Some(initial_w.to_string());
-//             // Transform results into tuple.
-//             let mut path: Vec<String> = Vec::new();
-//             // From importer to w:
-//             while w_or_none.is_some() {
-//                 let w = w_or_none.unwrap();
-//                 path.push(w.to_string());
-//                 w_or_none = pred[&w].as_ref();
-//             }
-//             path.reverse();
-//
-//             // From w to imported:
-//             w_or_none = succ[path.last().unwrap()].as_ref();
-//             while w_or_none.is_some() {
-//                 let w = w_or_none.unwrap();
-//                 path.push(w);
-//                 w_or_none = succ[&w].as_ref();
-//             }
-//
-//             Some(path)
-//         },
-//         None => None
-//     }
-// }
-// /// Performs a breadth first search from both source and target, meeting in the middle.
-// //
-// //  Returns:
-// //      (pred, succ, w) where
-// //         - pred is a dictionary of predecessors from w to the source, and
-// //         - succ is a dictionary of successors from w to the target.
-// //
-// fn search_for_path<'a>(
-//     importer: &'a str,
-//     imported: &'a str,
-//     importers_by_imported: &'a HashMap<String, HashSet<String>>,
-//     importeds_by_importer: &'a HashMap<String, HashSet<String>>
-// ) -> Option<
-//         (
-//             HashMap<String, Option<String>>,
-//             HashMap<String, Option<String>>,
-//             &'a str
-//         )
-//      >
-// {
-//     if importer == imported {
-//
-//         Some(
-//             (
-//                 HashMap::from([
-//                     (imported.to_string(), None),
-//                 ]),
-//                 HashMap::from([
-//                     (importer.to_string(), None),
-//                 ]),
-//                 importer
-//             )
-//         )
-//     }
-//     else {
-//         None // TODO
-//     }
-//
-// }
+fn search_for_path<'a>(
+    importer: &'a str,
+    imported: &'a str,
+    importers_by_imported: HashMap<&'a str, HashSet<&'a str>>,
+    importeds_by_importer: HashMap<&'a str, HashSet<&'a str>>,
+) -> Option<
+        (
+            HashMap<&'a str, Option<&'a str>>,
+            HashMap<&'a str, Option<&'a str>>,
+            &'a str
+        )
+     >
+{
+    if importer == imported {
+
+        Some(
+            (
+                HashMap::from([
+                    (imported, None),
+                ]),
+                HashMap::from([
+                    (importer, None),
+                ]),
+                importer
+            )
+        )
+    }
+    else {
+        let mut pred: HashMap<&str, Option<&str>> = HashMap::from([(importer, None)]);
+        let mut succ: HashMap<&str, Option<&str>> = HashMap::from([(imported, None)]);
+
+        // Initialize fringes, start with forward.
+        let mut forward_fringe: Vec<&str> = Vec::from([importer]);
+        let mut reverse_fringe: Vec<&str> = Vec::from([imported]);
+        let mut this_level: Vec<&str>;
+
+        while forward_fringe.len() == 0 && reverse_fringe.len() == 0 {
+            if forward_fringe.len() <= reverse_fringe.len() {
+                this_level = forward_fringe.to_vec();
+                forward_fringe = Vec::new();
+                for v in this_level {
+                    for w in &importeds_by_importer[v] {
+                        if !pred.contains_key(w) {
+                            forward_fringe.push(w);
+                            pred.insert(w, Some(w));
+                        }
+                        if succ.contains_key(w) {
+                            // Found path.
+                            return Some(
+                                (
+                                    pred,
+                                    succ,
+                                    w,
+                                )
+                            )
+                        }
+                        // TOD
+                    }
+                }
+            } else {
+                this_level = reverse_fringe.to_vec();
+                reverse_fringe = Vec::new();
+                for v in this_level {
+                    for w in &importers_by_imported[v] {
+                        if !succ.contains_key(w) {
+                            succ.insert(w, Some(v));
+                            reverse_fringe.push(w);
+                        }
+                        if pred.contains_key(w) {
+                            // Found path.
+                            return Some(
+                                (
+                                    pred,
+                                    succ,
+                                    w,
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+}
 
 
 /// A Python module implemented in Rust.
