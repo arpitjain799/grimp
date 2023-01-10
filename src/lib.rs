@@ -2,20 +2,35 @@ use pyo3::prelude::*;
 use pyo3::types::{PyUnicode, PyDict};
 use std::collections::{HashSet, HashMap};
 
-#[pyfunction]
-fn foo<'a>(
-    importer: &'a PyUnicode,
-    imported: &'a PyUnicode,
-    importers_by_imported: &'a PyDict,
-) -> PyResult<Option<Vec<&'a str>>> {
-    let _importer: &str = importer.extract()?;
-    let _imported: &str = imported.extract()?;
-    let _importers_by_imported: HashMap<&str, HashSet<&str>> = importers_by_imported.extract()?;
 
-    let mut list: Vec<&str> = Vec::new();
-    list.push(_importer);
-    list.push(_imported);
-    Ok(Some(list))
+
+#[test]
+fn test_bidi() {
+    let blue = "blue";
+    let green = "green";
+    let yellow = "yellow";
+    let blue_alpha = "blue.alpha";
+    let blue_beta = "blue.beta";
+
+    let importers_by_imported: HashMap<&str, HashSet<&str>> =
+        HashMap::from([
+            (blue, HashSet::from([green, blue_alpha])),
+            (green, HashSet::from([yellow, blue_beta])),
+            (blue_alpha, HashSet::new()),
+            (yellow, HashSet::new()),
+            (blue_beta, HashSet::new()),
+        ]);
+    let importeds_by_importer: HashMap<&str, HashSet<&str>> = HashMap::from([
+            (green, HashSet::from([blue])),
+            (blue_alpha, HashSet::from([blue])),
+            (yellow, HashSet::from([green])),
+            (blue_beta, HashSet::from([green])),
+            (blue, HashSet::new()),
+        ]);
+    let path_or_none: Option<Vec<&str>> = _bidirectional_shortest_path(
+        &yellow, &blue, importers_by_imported, importeds_by_importer
+    );
+    assert_eq!(path_or_none, Some(Vec::from([yellow, green, blue])));
 }
 
 /// Return a tuple of modules in the shortest path between importer and imported.
@@ -130,7 +145,7 @@ fn search_for_path<'a>(
         let mut reverse_fringe: Vec<&str> = Vec::from([imported]);
         let mut this_level: Vec<&str>;
 
-        while forward_fringe.len() == 0 && reverse_fringe.len() == 0 {
+        while forward_fringe.len() > 0 && reverse_fringe.len() > 0 {
             if forward_fringe.len() <= reverse_fringe.len() {
                 this_level = forward_fringe.to_vec();
                 forward_fringe = Vec::new();
@@ -138,7 +153,7 @@ fn search_for_path<'a>(
                     for w in &importeds_by_importer[v] {
                         if !pred.contains_key(w) {
                             forward_fringe.push(w);
-                            pred.insert(w, Some(w));
+                            pred.insert(w, Some(v));
                         }
                         if succ.contains_key(w) {
                             // Found path.
@@ -185,6 +200,6 @@ fn search_for_path<'a>(
 #[pymodule]
 fn _grimp_rust(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bidirectional_shortest_path, m)?)?;
-    m.add_function(wrap_pyfunction!(foo, m)?)?;
+    //m.add_function(wrap_pyfunction!(foo, m)?)?;
     Ok(())
 }
